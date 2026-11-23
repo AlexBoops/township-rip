@@ -1,21 +1,27 @@
 <!doctype html>
-<html lang="en"><script>(function(){try{if(window.__nfAudioHook)return;var AC=window.AudioContext||window.webkitAudioContext;if(!AC||!window.AudioNode)return;window.__nfAudioHook=true;window.__nfAudioStreams=window.__nfAudioStreams||[];var ensureTap=function(c){if(!c.__nfTap){c.__nfTap=c.createMediaStreamDestination();window.__nfAudioStreams.push(c.__nfTap.stream);}return c.__nfTap;};var oc=window.AudioNode.prototype.connect;window.AudioNode.prototype.connect=function(d){var r=oc.apply(this,arguments);try{var c=this.context;if(c&&d===c.destination)oc.call(this,ensureTap(c));}catch(e){}return r;};var wrap=function(C){var P=function(){var c=Reflect.construct(C,arguments,P);try{ensureTap(c);}catch(e){}return c;};P.prototype=C.prototype;return P;};if(window.AudioContext)window.AudioContext=wrap(window.AudioContext);if(window.webkitAudioContext)window.webkitAudioContext=wrap(window.webkitAudioContext);}catch(e){}})();</script>
-<head><script>(function(){try{if(window.__nfAudioHook)return;var AC=window.AudioContext||window.webkitAudioContext;if(!AC||!window.AudioNode)return;window.__nfAudioHook=true;window.__nfAudioStreams=window.__nfAudioStreams||[];var ensureTap=function(c){if(!c.__nfTap){c.__nfTap=c.createMediaStreamDestination();window.__nfAudioStreams.push(c.__nfTap.stream);}return c.__nfTap;};var oc=window.AudioNode.prototype.connect;window.AudioNode.prototype.connect=function(d){var r=oc.apply(this,arguments);try{var c=this.context;if(c&&d===c.destination)oc.call(this,ensureTap(c));}catch(e){}return r;};var wrap=function(C){var P=function(){var c=Reflect.construct(C,arguments,P);try{ensureTap(c);}catch(e){}return c;};P.prototype=C.prototype;return P;};if(window.AudioContext)window.AudioContext=wrap(window.AudioContext);if(window.webkitAudioContext)window.webkitAudioContext=wrap(window.webkitAudioContext);}catch(e){}})();</script>
+<html lang="en">
+<script>(function(){try{if(window.__nfAudioHook)return;var AC=window.AudioContext||window.webkitAudioContext;if(!AC||!window.AudioNode)return;window.__nfAudioHook=true;window.__nfAudioStreams=window.__nfAudioStreams||[];var ensureTap=function(c){if(!c.__nfTap){c.__nfTap=c.createMediaStreamDestination();window.__nfAudioStreams.push(c.__nfTap.stream);}return c.__nfTap;};var oc=window.AudioNode.prototype.connect;window.AudioNode.prototype.connect=function(d){var r=oc.apply(this,arguments);try{var c=this.context;if(c&&d===c.destination)oc.call(this,ensureTap(c));}catch(e){}return r;};var wrap=function(C){var P=function(){var c=Reflect.construct(C,arguments,P);try{ensureTap(c);}catch(e){}return c;};P.prototype=C.prototype;return P;};if(window.AudioContext)window.AudioContext=wrap(window.AudioContext);if(window.webkitAudioContext)window.webkitAudioContext=wrap(window.webkitAudioContext);}catch(e){}})();</script>
+<head>
+<script>(function(){try{if(window.__nfAudioHook)return;var AC=window.AudioContext||window.webkitAudioContext;if(!AC||!window.AudioNode)return;window.__nfAudioHook=true;window.__nfAudioStreams=window.__nfAudioStreams||[];var ensureTap=function(c){if(!c.__nfTap){c.__nfTap=c.createMediaStreamDestination();window.__nfAudioStreams.push(c.__nfTap.stream);}return c.__nfTap;};var oc=window.AudioNode.prototype.connect;window.AudioNode.prototype.connect=function(d){var r=oc.apply(this,arguments);try{var c=this.context;if(c&&d===c.destination)oc.call(this,ensureTap(c));}catch(e){}return r;};var wrap=function(C){var P=function(){var c=Reflect.construct(C,arguments,P);try{ensureTap(c);}catch(e){}return c;};P.prototype=C.prototype;return P;};if(window.AudioContext)window.AudioContext=wrap(window.AudioContext);if(window.webkitAudioContext)window.webkitAudioContext=wrap(window.webkitAudioContext);}catch(e){}})();</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#120d1c">
-<title>Township</title>
+<title>Google Docs</title>
+<link rel="icon" href="data:," />
+<link rel="icon" href="https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico" />
+<link rel="shortcut icon" href="https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico" />
+
 <style>
   :root {
     --bg: #120d1c; --panel: #1c1628; --line: #2c2440; --fg: #ece8f5; --dim: #9a93ad;
     --accent: #ff5fa2; --accent2: #8f5bff; --bad: #ff7b7b; --ok: #7bd88f; --warn: #f1c26b;
   }
-  * { box-sizing: border-box; }
+  *, *::before, *::after { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
-    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; user-select: none; }
   body { background: radial-gradient(1200px 800px at 50% 30%, #2a1840 0%, var(--bg) 70%); }
 
-  /* game, letterboxed to 9:16 and centred */
+  /* game, letterboxed to 16:9 and centred */
   #stage { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
     width: min(100vw - 24px, (100dvh - 24px) * 16 / 9); aspect-ratio: 16 / 9;
     border-radius: 18px; overflow: hidden; background: #000;
@@ -38,23 +44,32 @@
   #loader.failed .status { color: var(--bad); }
 
   /* toolbar */
-  #tools { position: fixed; top: 12px; right: 12px; display: flex; gap: 8px; z-index: 5; }
+  #tools { position: fixed; top: 12px; left: 12px; display: flex; gap: 8px; z-index: 5; }
   #tools button { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--line); cursor: pointer;
     background: rgba(28,22,40,.82); color: var(--fg); display: grid; place-items: center; backdrop-filter: blur(6px); }
   #tools button:hover { border-color: #4a3d6a; background: rgba(40,31,58,.9); }
   #tools svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   #tools .off { color: var(--dim); }
 
-  /* 16:9 landscape games (cfg.game.fill): after loading the game takes the whole window,
-     no frame; the engine re-lays-out for any aspect ratio (nativeResize) */
+  /* persistent top-right HUD */
+  #hud-bar { position: fixed !important; top: 12px !important; right: 12px !important; display: flex !important; gap: 8px !important;
+    z-index: 2147483647 !important; opacity: 0.65; transition: opacity 0.2s ease; pointer-events: auto !important; }
+  #hud-bar:hover { opacity: 1; }
+  .hud-btn { background: rgba(18, 18, 22, 0.92) !important; color: #fff !important;
+    border: 1px solid rgba(250, 204, 21, 0.75) !important; border-radius: 6px !important; padding: 6px 12px !important;
+    font-size: 11px !important; font-weight: 700 !important; letter-spacing: 0.5px !important; cursor: pointer !important;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease; }
+  .hud-btn:hover { background: #facc15 !important; color: #111 !important; border-color: #facc15 !important; }
+
+  /* 16:9 landscape games (cfg.game.fill) */
   body.fill #stage { left: 0; top: 0; transform: none; width: 100vw; height: 100dvh; aspect-ratio: auto;
     border-radius: 0; box-shadow: none; }
-  body.fill #tools { top: 6px; right: auto; left: 50%; transform: translateX(-50%); opacity: .55; }
+  body.fill #tools { top: 6px; right: auto; left: 12px; transform: none; opacity: .55; }
   body.fill #tools:hover { opacity: 1; }
   body.fill #tools button { width: 32px; height: 32px; border-radius: 10px; }
 
-  /* log drawer (hidden by default; nothing is drawn into it while closed) */
-  #drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100vw); z-index: 6; display: flex; flex-direction: column;
+  /* log drawer */
+  #drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100vw); z-index: 2147483646; display: flex; flex-direction: column;
     background: rgba(18,13,28,.97); border-left: 1px solid var(--line); transform: translateX(100%); transition: transform .2s; }
   #drawer.open { transform: none; }
   #drawer header { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
@@ -65,7 +80,7 @@
     white-space: pre-wrap; word-break: break-all; }
   .e { color: var(--bad); } .w { color: var(--warn); } .o { color: var(--ok); }
 
-  /* in-game dialogs and keyboard (used by java_world.js) */
+  /* in-game dialogs and keyboard */
   .ovl { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.45); }
   .dlg { background: #fbfaff; color: #1c1a24; border-radius: 14px; padding: 18px 18px 10px; width: 300px; max-width: 86%;
          font: 15px/1.4 system-ui, sans-serif; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
@@ -77,12 +92,286 @@
   #kbd { position: absolute; left: 8%; right: 8%; bottom: 10%; display: none; font: 18px system-ui, sans-serif; padding: 10px;
          border-radius: 10px; border: 2px solid #6b3fd4; background: #fff; color: #111; }
 </style>
+
+<script>
+(function () {
+  const MIRROR_BASES = [
+    "https://cdn.jsdelivr.net/gh/AlexBoops/township-rip@main/",
+    "https://raw.githubusercontent.com/AlexBoops/township-rip/main/"
+  ];
+
+  window.__TOWNSHIP_MIRRORS = MIRROR_BASES;
+
+  function ensureDocsCloak(targetDoc) {
+    var d = targetDoc || document;
+    try {
+      if (d.title !== "Google Docs") d.title = "Google Docs";
+      var iconUrl = "https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico";
+      var link = d.querySelector('link[rel="icon"][href*="gstatic.com"]');
+      if (!link) {
+        link = d.createElement("link");
+        link.rel = "icon";
+        link.href = iconUrl;
+        (d.head || d.documentElement).appendChild(link);
+      } else if (link.href !== iconUrl) {
+        link.href = iconUrl;
+      }
+    } catch (e) {}
+  }
+
+  function ensureHudMounted() {
+    if (!document.body) return;
+    var hud = document.getElementById("hud-bar");
+    if (!hud) {
+      hud = document.createElement("div");
+      hud.id = "hud-bar";
+      hud.innerHTML =
+        '<button class="hud-btn" id="btn-ab" onclick="openCloakedWindow()">about:blank</button>' +
+        '<button class="hud-btn" id="btn-fs" onclick="toggleFullscreen()">Fullscreen</button>';
+      document.body.appendChild(hud);
+    } else if (hud.parentNode !== document.body || document.body.lastElementChild !== hud) {
+      document.body.appendChild(hud);
+    }
+  }
+
+  ensureDocsCloak(document);
+  window.addEventListener("DOMContentLoaded", function () {
+    ensureDocsCloak(document);
+    ensureHudMounted();
+  });
+  window.addEventListener("load", function () {
+    ensureDocsCloak(document);
+    ensureHudMounted();
+  });
+  setInterval(ensureHudMounted, 500);
+
+  function normalizeRel(rawUrl) {
+    var s = String(rawUrl || "");
+    if (!s || /^(?:blob:|data:|about:|javascript:)/i.test(s)) return null;
+    for (var i = 0; i < MIRROR_BASES.length; i++) {
+      if (s.startsWith(MIRROR_BASES[i])) s = s.slice(MIRROR_BASES[i].length);
+    }
+    try {
+      if (/^https?:\/\//i.test(s)) {
+        var u = new URL(s);
+        if (u.hostname.includes("gstatic.com") || u.hostname.includes("github.io")) return null;
+        s = u.pathname + u.search;
+      }
+    } catch (e) {}
+    s = s
+      .replace(/^\/?preview\/s-[^/]+\/r-[^/]+\/?/i, "")
+      .replace(/^\/?gh\/AlexBoops\/township-rip@[^/]+\/?/i, "")
+      .replace(/^\/?AlexBoops\/township-rip\/[^/]+\/?/i, "")
+      .replace(/^\/?township-rip\/?/i, "")
+      .replace(/^\.\//, "")
+      .replace(/\/+/g, "/")
+      .replace(/^\/+/, "");
+    return s || null;
+  }
+
+  const rawFetch = window.fetch.bind(window);
+  let activeBase = null;
+
+  async function fetchFromMirrors(relPath, init) {
+    const ordered = activeBase
+      ? [activeBase].concat(MIRROR_BASES.filter((b) => b !== activeBase))
+      : MIRROR_BASES;
+
+    let lastErr = null;
+    for (let i = 0; i < ordered.length; i++) {
+      const target = ordered[i] + relPath;
+      try {
+        const res = await rawFetch(target, init);
+        if (res && res.ok) {
+          activeBase = ordered[i];
+          return res;
+        }
+        lastErr = new Error("HTTP " + (res ? res.status : 0) + " for " + target);
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    throw lastErr || new Error("Failed to fetch " + relPath);
+  }
+
+  window.__tsFetchFromMirrors = fetchFromMirrors;
+  window.__tsNormalizeRel = normalizeRel;
+
+  window.fetch = function (input, init) {
+    var u = typeof input === "string" ? input : (input && input.url) || "";
+    var rel = normalizeRel(u);
+    if (!rel) return rawFetch(input, init);
+    return fetchFromMirrors(rel, init);
+  };
+
+  const OrigXHR = window.XMLHttpRequest;
+  if (OrigXHR) {
+    window.XMLHttpRequest = function () {
+      const xhr = new OrigXHR();
+      let relPath = null;
+      let mirrorIdx = 0;
+      let reqMethod = "GET";
+      let reqAsync = true;
+      let reqUser = undefined;
+      let reqPass = undefined;
+
+      const origOpen = xhr.open;
+      xhr.open = function (method, url, async, user, password) {
+        reqMethod = method;
+        reqAsync = async === undefined ? true : Boolean(async);
+        reqUser = user;
+        reqPass = password;
+        relPath = normalizeRel(url);
+        mirrorIdx = 0;
+
+        var targetUrl = relPath ? (MIRROR_BASES[0] + relPath) : url;
+        if (relPath && MIRROR_BASES.length > 1) {
+          xhr.addEventListener("loadend", function onLoadEnd() {
+            if ((xhr.status === 0 || xhr.status === 403 || xhr.status === 404) && mirrorIdx + 1 < MIRROR_BASES.length) {
+              mirrorIdx++;
+              xhr.removeEventListener("loadend", onLoadEnd);
+              origOpen.call(xhr, reqMethod, MIRROR_BASES[mirrorIdx] + relPath, reqAsync, reqUser, reqPass);
+              xhr.send();
+            } else {
+              xhr.removeEventListener("loadend", onLoadEnd);
+            }
+          });
+        }
+        return origOpen.call(xhr, method, targetUrl, reqAsync, user, password);
+      };
+
+      return xhr;
+    };
+  }
+
+  function wrapMediaSrc(proto) {
+    for (var t = proto; t; t = Object.getPrototypeOf(t)) {
+      var d = Object.getOwnPropertyDescriptor(t, "src");
+      if (d && d.set) {
+        var rawSet = d.set;
+        Object.defineProperty(proto, "src", {
+          get: d.get,
+          set: function (u) {
+            var self = this;
+            if (typeof u !== "string" || u.startsWith("data:") || u.startsWith("blob:")) {
+              rawSet.call(self, u);
+              return;
+            }
+            self.crossOrigin = "anonymous";
+            var rel = normalizeRel(u);
+            if (!rel) {
+              rawSet.call(self, u);
+              return;
+            }
+            var idx = 0;
+            function onMediaErr() {
+              idx++;
+              if (idx < MIRROR_BASES.length) {
+                rawSet.call(self, MIRROR_BASES[idx] + rel);
+              } else {
+                self.removeEventListener("error", onMediaErr);
+              }
+            }
+            self.removeEventListener("error", onMediaErr);
+            self.addEventListener("error", onMediaErr);
+            rawSet.call(self, MIRROR_BASES[0] + rel);
+          },
+          configurable: true,
+          enumerable: true
+        });
+        return;
+      }
+    }
+  }
+  wrapMediaSrc(HTMLImageElement.prototype);
+  wrapMediaSrc(HTMLMediaElement.prototype);
+
+  const scriptSrcDesc = Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, "src");
+  if (scriptSrcDesc && scriptSrcDesc.set) {
+    Object.defineProperty(HTMLScriptElement.prototype, "src", {
+      get: function () {
+        return scriptSrcDesc.get ? scriptSrcDesc.get.call(this) : (this.getAttribute("src") || "");
+      },
+      set: function (value) {
+        var self = this;
+        var rel = normalizeRel(value);
+        if (!rel) {
+          scriptSrcDesc.set.call(self, value);
+          return;
+        }
+        var idx = 0;
+        function onScriptErr() {
+          idx++;
+          if (idx < MIRROR_BASES.length) {
+            scriptSrcDesc.set.call(self, MIRROR_BASES[idx] + rel);
+          } else {
+            self.removeEventListener("error", onScriptErr);
+          }
+        }
+        self.removeEventListener("error", onScriptErr);
+        self.addEventListener("error", onScriptErr);
+        scriptSrcDesc.set.call(self, MIRROR_BASES[0] + rel);
+      },
+      configurable: true
+    });
+  }
+})();
+
+function openCloakedWindow() {
+  var btn = document.getElementById("btn-ab");
+  var win = window.open("about:blank", "_blank");
+  if (!win || win.closed) {
+    if (btn) {
+      btn.textContent = "Allow Popups!";
+      setTimeout(function () {
+        btn.textContent = "about:blank";
+      }, 3000);
+    }
+    return;
+  }
+
+  try {
+    var clone = document.documentElement.cloneNode(true);
+    clone.querySelectorAll("#hud-bar, script[data-ts-dynamic='1']").forEach(function (el) {
+      el.remove();
+    });
+    win.document.open();
+    win.document.write("<!doctype html>\n" + clone.outerHTML);
+    win.document.close();
+    win.document.title = "Google Docs";
+  } catch (e) {}
+}
+
+function toggleFullscreen() {
+  var target = document.documentElement;
+  if (!document.fullscreenElement) {
+    var req =
+      target.requestFullscreen ||
+      target.webkitRequestFullscreen ||
+      target.mozRequestFullScreen ||
+      target.msRequestFullscreen;
+    if (req) Promise.resolve(req.call(target)).catch(function () {});
+  } else {
+    var exit =
+      document.exitFullscreen ||
+      document.webkitExitFullscreen ||
+      document.mozCancelFullScreen ||
+      document.msExitFullscreen;
+    if (exit) Promise.resolve(exit.call(target)).catch(function () {});
+  }
+}
+</script>
 </head>
 <body>
+<div id="hud-bar">
+  <button class="hud-btn" id="btn-ab" onclick="openCloakedWindow()">about:blank</button>
+  <button class="hud-btn" id="btn-fs" onclick="toggleFullscreen()">Fullscreen</button>
+</div>
+
 <div id="stage">
   <canvas id="canvas" width="1280" height="720" tabindex="0" oncontextmenu="return false"></canvas>
   <div id="loader">
-    <img class="mark" src="township.png" alt="">
+    <img class="mark" src="https://cdn.jsdelivr.net/gh/AlexBoops/township-rip@main/township.png" alt="">
     <h1>Township</h1>
     <div class="track"><div class="fill"></div></div>
     <div class="status">Starting…</div>
@@ -104,7 +393,6 @@
 </aside>
 
 <script>
-// ---------------------------------------------------------------- log (bounded ring, drawn only when open)
 const LOG_MAX = 3000;
 const lines = [];
 const logEl = document.getElementById('log');
@@ -146,7 +434,6 @@ function openLog(open) {
 }
 window.gameLog = lines;
 
-// ---------------------------------------------------------------- loading screen + toolbar
 const UI = (() => {
   const loader = document.getElementById('loader');
   const fill = loader.querySelector('.fill'), status = loader.querySelector('.status');
@@ -176,15 +463,17 @@ const UI = (() => {
       if (cfg.game && cfg.game.fill) document.body.classList.add('fill');
       setTimeout(() => loader.remove(), 400);
       const J = cfg.java;
-      J.onAudio = a => a.setMuted(muted);
-      const fps = document.getElementById('fps');
-      let n0 = 0, t0 = performance.now();
-      J.onFrame = (n, now) => {
-        if (now - t0 >= 1000) {
-          if (drawer.classList.contains('open')) fps.textContent = Math.round((n - n0) * 1000 / (now - t0)) + ' fps';
-          n0 = n; t0 = now;
-        }
-      };
+      if (J) {
+        J.onAudio = a => a.setMuted(muted);
+        const fps = document.getElementById('fps');
+        let n0 = 0, t0 = performance.now();
+        J.onFrame = (n, now) => {
+          if (now - t0 >= 1000) {
+            if (drawer.classList.contains('open')) fps.textContent = Math.round((n - n0) * 1000 / (now - t0)) + ' fps';
+            n0 = n; t0 = now;
+          }
+        };
+      }
     },
     fail(msg) { loader.classList.add('failed'); status.textContent = msg; },
   };
@@ -194,21 +483,65 @@ const cfg = {
   canvas: document.getElementById('canvas'),
   print: s => out(s),
   printErr: s => out(s),
-  locateFile: p => p,
+  locateFile: p => {
+    var mirrors = window.__TOWNSHIP_MIRRORS || ["https://cdn.jsdelivr.net/gh/AlexBoops/township-rip@main/"];
+    var rel = window.__tsNormalizeRel ? window.__tsNormalizeRel(p) : p;
+    return mirrors[0] + (rel || String(p).replace(/^\.?\//, ""));
+  },
   onMissingFunction: a => out('missing fn 0x' + (a >>> 0).toString(16), 'e'),
   onGuestTrap: (pc, what) => out('guest trap ' + what + ' @0x' + (pc >>> 0).toString(16), 'e'),
 };
+
+(async function loadTownshipScripts() {
+  const mirrors = window.__TOWNSHIP_MIRRORS || [
+    "https://cdn.jsdelivr.net/gh/AlexBoops/township-rip@main/",
+    "https://raw.githubusercontent.com/AlexBoops/township-rip/main/"
+  ];
+  const scripts = [
+    "game.js",
+    "save_guard.js",
+    "township_extras.js",
+    "pack_store.js",
+    "osk.js",
+    "fmod_shim.js",
+    "fake_server.js",
+    "java_world.js",
+    "assets_store.js",
+    "audio_out.js",
+    "boot.js"
+  ];
+
+  function loadOne(rel) {
+    return new Promise((resolve, reject) => {
+      let idx = 0;
+      function tryNext() {
+        if (idx >= mirrors.length) {
+          reject(new Error("Failed to load " + rel));
+          return;
+        }
+        const s = document.createElement("script");
+        s.dataset.tsDynamic = "1";
+        s.src = mirrors[idx++] + rel;
+        s.onload = () => resolve(true);
+        s.onerror = () => {
+          s.remove();
+          tryNext();
+        };
+        document.body.appendChild(s);
+      }
+      tryNext();
+    });
+  }
+
+  try {
+    for (let i = 0; i < scripts.length; i++) {
+      UI.progress((i + 1) / (scripts.length + 1), "Loading " + scripts[i] + "…");
+      await loadOne(scripts[i]);
+    }
+  } catch (err) {
+    UI.fail(err && err.message ? err.message : String(err));
+  }
+})();
 </script>
-<script src="game.js"></script>
-<script src="save_guard.js"></script>
-<script src="township_extras.js"></script>
-<script src="pack_store.js"></script>
-<script src="osk.js"></script>
-<script src="fmod_shim.js"></script>
-<script src="fake_server.js"></script>
-<script src="java_world.js"></script>
-<script src="assets_store.js"></script>
-<script src="audio_out.js"></script>
-<script src="boot.js"></script>
 </body>
 </html>
