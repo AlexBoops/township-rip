@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en"><script>(function(){try{if(window.__nfAudioHook)return;var AC=window.AudioContext||window.webkitAudioContext;if(!AC||!window.AudioNode)return;window.__nfAudioHook=true;window.__nfAudioStreams=window.__nfAudioStreams||[];var ensureTap=function(c){if(!c.__nfTap){c.__nfTap=c.createMediaStreamDestination();window.__nfAudioStreams.push(c.__nfTap.stream);}return c.__nfTap;};var oc=window.AudioNode.prototype.connect;window.AudioNode.prototype.connect=function(d){var r=oc.apply(this,arguments);try{var c=this.context;if(c&&d===c.destination)oc.call(this,ensureTap(c));}catch(e){}return r;};var wrap=function(C){var P=function(){var c=Reflect.construct(C,arguments,P);try{ensureTap(c);}catch(e){}return c;};P.prototype=C.prototype;return P;};if(window.AudioContext)window.AudioContext=wrap(window.AudioContext);if(window.webkitAudioContext)window.webkitAudioContext=wrap(window.webkitAudioContext);}catch(e){}})();</script>
+<head><script>(function(){try{if(window.__nfAudioHook)return;var AC=window.AudioContext||window.webkitAudioContext;if(!AC||!window.AudioNode)return;window.__nfAudioHook=true;window.__nfAudioStreams=window.__nfAudioStreams||[];var ensureTap=function(c){if(!c.__nfTap){c.__nfTap=c.createMediaStreamDestination();window.__nfAudioStreams.push(c.__nfTap.stream);}return c.__nfTap;};var oc=window.AudioNode.prototype.connect;window.AudioNode.prototype.connect=function(d){var r=oc.apply(this,arguments);try{var c=this.context;if(c&&d===c.destination)oc.call(this,ensureTap(c));}catch(e){}return r;};var wrap=function(C){var P=function(){var c=Reflect.construct(C,arguments,P);try{ensureTap(c);}catch(e){}return c;};P.prototype=C.prototype;return P;};if(window.AudioContext)window.AudioContext=wrap(window.AudioContext);if(window.webkitAudioContext)window.webkitAudioContext=wrap(window.webkitAudioContext);}catch(e){}})();</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#120d1c">
+<title>Township</title>
+<style>
+  :root {
+    --bg: #120d1c; --panel: #1c1628; --line: #2c2440; --fg: #ece8f5; --dim: #9a93ad;
+    --accent: #ff5fa2; --accent2: #8f5bff; --bad: #ff7b7b; --ok: #7bd88f; --warn: #f1c26b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+  body { background: radial-gradient(1200px 800px at 50% 30%, #2a1840 0%, var(--bg) 70%); }
+
+  /* game, letterboxed to 9:16 and centred */
+  #stage { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: min(100vw - 24px, (100dvh - 24px) * 16 / 9); aspect-ratio: 16 / 9;
+    border-radius: 18px; overflow: hidden; background: #000;
+    box-shadow: 0 20px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.06); }
+  @media (max-height: 500px) { #stage { width: min(100vw, 100dvh * 16 / 9); border-radius: 0; box-shadow: none; } }
+  #canvas { width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+
+  /* loading screen */
+  #loader { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px; padding: 32px; text-align: center;
+    background: linear-gradient(160deg, #3b1f63 0%, #22143a 55%, #150e22 100%); transition: opacity .35s; }
+  #loader.gone { opacity: 0; pointer-events: none; }
+  #loader .mark { width: 112px; height: 112px; border-radius: 28px; object-fit: cover; display: block;
+    box-shadow: 0 10px 30px rgba(255,95,162,.35), 0 0 0 1px rgba(255,255,255,.12); }
+  #loader h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .2px; }
+  #loader .track { width: min(260px, 80%); height: 8px; border-radius: 99px; background: rgba(255,255,255,.12); overflow: hidden; }
+  #loader .fill { height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .2s; }
+  #loader .status { color: var(--dim); font-size: 13px; min-height: 1.4em; font-variant-numeric: tabular-nums; }
+  #loader.failed .mark { filter: grayscale(1) brightness(.7); box-shadow: none; }
+  #loader.failed .status { color: var(--bad); }
+
+  /* toolbar */
+  #tools { position: fixed; top: 12px; right: 12px; display: flex; gap: 8px; z-index: 5; }
+  #tools button { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--line); cursor: pointer;
+    background: rgba(28,22,40,.82); color: var(--fg); display: grid; place-items: center; backdrop-filter: blur(6px); }
+  #tools button:hover { border-color: #4a3d6a; background: rgba(40,31,58,.9); }
+  #tools svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  #tools .off { color: var(--dim); }
+
+  /* 16:9 landscape games (cfg.game.fill): after loading the game takes the whole window,
+     no frame; the engine re-lays-out for any aspect ratio (nativeResize) */
+  body.fill #stage { left: 0; top: 0; transform: none; width: 100vw; height: 100dvh; aspect-ratio: auto;
+    border-radius: 0; box-shadow: none; }
+  body.fill #tools { top: 6px; right: auto; left: 50%; transform: translateX(-50%); opacity: .55; }
+  body.fill #tools:hover { opacity: 1; }
+  body.fill #tools button { width: 32px; height: 32px; border-radius: 10px; }
+
+  /* log drawer (hidden by default; nothing is drawn into it while closed) */
+  #drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100vw); z-index: 6; display: flex; flex-direction: column;
+    background: rgba(18,13,28,.97); border-left: 1px solid var(--line); transform: translateX(100%); transition: transform .2s; }
+  #drawer.open { transform: none; }
+  #drawer header { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  #drawer header b { flex: 1; }
+  #drawer header span { color: var(--dim); font: 12px ui-monospace, Consolas, monospace; }
+  #drawer header button { border: 1px solid var(--line); background: none; color: var(--fg); border-radius: 8px; padding: 4px 10px; cursor: pointer; }
+  #log { flex: 1; overflow: auto; padding: 8px 12px; font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace;
+    white-space: pre-wrap; word-break: break-all; }
+  .e { color: var(--bad); } .w { color: var(--warn); } .o { color: var(--ok); }
+
+  /* in-game dialogs and keyboard (used by java_world.js) */
+  .ovl { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.45); }
+  .dlg { background: #fbfaff; color: #1c1a24; border-radius: 14px; padding: 18px 18px 10px; width: 300px; max-width: 86%;
+         font: 15px/1.4 system-ui, sans-serif; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+  .dlg h3 { margin: 0 0 8px; font-size: 17px; }
+  .dlg p { margin: 0 0 14px; white-space: pre-wrap; }
+  .dlg .btns { display: flex; justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
+  .dlg button { border: 0; background: none; color: #6b3fd4; font: 600 14px system-ui, sans-serif; padding: 8px 10px; cursor: pointer; border-radius: 6px; }
+  .dlg button:hover { background: #efe9ff; }
+  #kbd { position: absolute; left: 8%; right: 8%; bottom: 10%; display: none; font: 18px system-ui, sans-serif; padding: 10px;
+         border-radius: 10px; border: 2px solid #6b3fd4; background: #fff; color: #111; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="canvas" width="1280" height="720" tabindex="0" oncontextmenu="return false"></canvas>
+  <div id="loader">
+    <img class="mark" src="township.png" alt="">
+    <h1>Township</h1>
+    <div class="track"><div class="fill"></div></div>
+    <div class="status">Starting…</div>
+  </div>
+</div>
+
+<div id="tools">
+  <button id="bSound" title="Sound on/off" aria-label="Sound on/off">
+    <svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path class="wave" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/><path class="x" d="M16 9l5 6M21 9l-5 6" style="display:none"/></svg>
+  </button>
+  <button id="bLog" title="Log" aria-label="Log">
+    <svg viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h9"/></svg>
+  </button>
+</div>
+
+<aside id="drawer" aria-label="Log">
+  <header><b>Log</b><span id="fps"></span><button id="bClose">Close</button></header>
+  <div id="log"></div>
+</aside>
+
+<script>
+// ---------------------------------------------------------------- log (bounded ring, drawn only when open)
+const LOG_MAX = 3000;
+const lines = [];
+const logEl = document.getElementById('log');
+const drawer = document.getElementById('drawer');
+let logPending = [];
+function cls(s) {
+  if (/TRAP|FATAL|MISSING|UNIMPLEMENTED|error|failed/i.test(s)) return 'e';
+  if (/warn|unhandled|refused/i.test(s)) return 'w';
+  if (/done|attached|ready|started/i.test(s)) return 'o';
+  return '';
+}
+function logRow(s, c) { const d = document.createElement('div'); if (c) d.className = c; d.textContent = s; return d; }
+let logFlush = 0;
+function out(s, c) {
+  s = String(s);
+  lines.push(s);
+  if (lines.length > LOG_MAX) lines.splice(0, lines.length - LOG_MAX);
+  if (!drawer.classList.contains('open')) return;
+  logPending.push([s, c === undefined ? cls(s) : c]);
+  if (!logFlush) logFlush = requestAnimationFrame(() => {
+    logFlush = 0;
+    const atEnd = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 30;
+    const frag = document.createDocumentFragment();
+    for (const [t, k] of logPending.splice(0)) frag.appendChild(logRow(t, k));
+    logEl.appendChild(frag);
+    while (logEl.childNodes.length > LOG_MAX) logEl.removeChild(logEl.firstChild);
+    if (atEnd) logEl.scrollTop = logEl.scrollHeight;
+  });
+}
+function openLog(open) {
+  drawer.classList.toggle('open', open);
+  if (open) {
+    logEl.textContent = '';
+    const frag = document.createDocumentFragment();
+    for (const s of lines) frag.appendChild(logRow(s, cls(s)));
+    logEl.appendChild(frag);
+    logEl.scrollTop = logEl.scrollHeight;
+  } else logEl.textContent = '';
+}
+window.gameLog = lines;
+
+// ---------------------------------------------------------------- loading screen + toolbar
+const UI = (() => {
+  const loader = document.getElementById('loader');
+  const fill = loader.querySelector('.fill'), status = loader.querySelector('.status');
+  let muted = false;
+  try { muted = localStorage.getItem('muted') === '1'; } catch (e) {}
+  const bSound = document.getElementById('bSound');
+  const paintSound = () => {
+    bSound.classList.toggle('off', muted);
+    bSound.querySelector('.wave').style.display = muted ? 'none' : '';
+    bSound.querySelector('.x').style.display = muted ? '' : 'none';
+  };
+  paintSound();
+  bSound.onclick = () => {
+    muted = !muted;
+    try { localStorage.setItem('muted', muted ? '1' : '0'); } catch (e) {}
+    const J = cfg.java;
+    if (J && J.audio) J.audio.setMuted(muted); else if (J && J.startAudio) J.startAudio();
+    paintSound();
+  };
+  document.getElementById('bLog').onclick = () => openLog(!drawer.classList.contains('open'));
+  document.getElementById('bClose').onclick = () => openLog(false);
+  if (/[?&]debug=1/.test(location.search)) openLog(true);
+  return {
+    progress(f, text) { fill.style.width = Math.max(2, Math.min(100, f * 100)) + '%'; if (text) status.textContent = text; },
+    ready() {
+      loader.classList.add('gone');
+      if (cfg.game && cfg.game.fill) document.body.classList.add('fill');
+      setTimeout(() => loader.remove(), 400);
+      const J = cfg.java;
+      J.onAudio = a => a.setMuted(muted);
+      const fps = document.getElementById('fps');
+      let n0 = 0, t0 = performance.now();
+      J.onFrame = (n, now) => {
+        if (now - t0 >= 1000) {
+          if (drawer.classList.contains('open')) fps.textContent = Math.round((n - n0) * 1000 / (now - t0)) + ' fps';
+          n0 = n; t0 = now;
+        }
+      };
+    },
+    fail(msg) { loader.classList.add('failed'); status.textContent = msg; },
+  };
+})();
+
+const cfg = {
+  canvas: document.getElementById('canvas'),
+  print: s => out(s),
+  printErr: s => out(s),
+  locateFile: p => p,
+  onMissingFunction: a => out('missing fn 0x' + (a >>> 0).toString(16), 'e'),
+  onGuestTrap: (pc, what) => out('guest trap ' + what + ' @0x' + (pc >>> 0).toString(16), 'e'),
+};
+</script>
+<script src="game.js"></script>
+<script src="save_guard.js"></script>
+<script src="township_extras.js"></script>
+<script src="pack_store.js"></script>
+<script src="osk.js"></script>
+<script src="fmod_shim.js"></script>
+<script src="fake_server.js"></script>
+<script src="java_world.js"></script>
+<script src="assets_store.js"></script>
+<script src="audio_out.js"></script>
+<script src="boot.js"></script>
+</body>
+</html>

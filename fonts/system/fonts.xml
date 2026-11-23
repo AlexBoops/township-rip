@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android system font list (format of Android 9-11 /system/etc/fonts.xml). The engine draws
+     user-typed text (town name box, town sign) with system fonts chosen through this file;
+     every family points at the one font the page provides (Roboto Slab from the game's APK). -->
+<familyset version="23">
+    <family name="sans-serif">
+        <font weight="100" style="normal">Roboto-Regular.ttf</font>
+        <font weight="300" style="normal">Roboto-Regular.ttf</font>
+        <font weight="400" style="normal">Roboto-Regular.ttf</font>
+        <font weight="400" style="italic">Roboto-Regular.ttf</font>
+        <font weight="500" style="normal">Roboto-Regular.ttf</font>
+        <font weight="700" style="normal">Roboto-Regular.ttf</font>
+        <font weight="700" style="italic">Roboto-Regular.ttf</font>
+        <font weight="900" style="normal">Roboto-Regular.ttf</font>
+    </family>
+    <alias name="sans-serif-thin" to="sans-serif" weight="100" />
+    <alias name="sans-serif-light" to="sans-serif" weight="300" />
+    <alias name="sans-serif-medium" to="sans-serif" weight="500" />
+    <alias name="sans-serif-black" to="sans-serif" weight="900" />
+    <alias name="arial" to="sans-serif" />
+    <alias name="helvetica" to="sans-serif" />
+    <alias name="tahoma" to="sans-serif" />
+    <alias name="verdana" to="sans-serif" />
+    <family name="sans-serif-condensed">
+        <font weight="400" style="normal">Roboto-Regular.ttf</font>
+        <font weight="700" style="normal">Roboto-Regular.ttf</font>
+    </family>
+    <family name="serif">
+        <font weight="400" style="normal">Roboto-Regular.ttf</font>
+        <font weight="700" style="normal">Roboto-Regular.ttf</font>
+    </family>
+    <alias name="times" to="serif" />
+    <alias name="georgia" to="serif" />
+    <!-- the game's FreeTypeFonts.xml asks for "System.SFPro-*" (Apple's system font names) -->
+    <family name="SFPro-Regular">
+        <font weight="400" style="normal">Roboto-Regular.ttf</font>
+    </family>
+    <family name="SFPro-Light">
+        <font weight="300" style="normal">Roboto-Regular.ttf</font>
+    </family>
+    <family name="SFPro-Semibold">
+        <font weight="600" style="normal">Roboto-Regular.ttf</font>
+    </family>
+    <family name="monospace">
+        <font weight="400" style="normal">Roboto-Regular.ttf</font>
+    </family>
+    <alias name="courier" to="monospace" />
+    <!-- fallback chain, by script -->
+    <family lang="und-Latn" variant="elegant">
+        <font weight="400" style="normal">Roboto-Regular.ttf</font>
+        <font weight="700" style="normal">Roboto-Regular.ttf</font>
+    </family>
+    <family lang="und-Latn" variant="compact">
+        <font weight="400" style="normal">Roboto-Regular.ttf</font>
+    </family>
+    <family lang="und-Grek">
+        <font weight="400" style="normal">Roboto-Regular.ttf</font>
+    </family>
+    <family lang="und-Cyrl">
+        <font weight="400" style="normal">Roboto-Regular.ttf</font>
+    </family>
+    <family lang="und-Zsye">
+        <font weight="400" style="normal">Roboto-Regular.ttf</font>
+    </family>
+    <family lang="und-Zsym">
+        <font weight="400" style="normal">Roboto-Regular.ttf</font>
+    </family>
+    <family>
+        <font weight="400" style="normal">Roboto-Regular.ttf</font>
+    </family>
+</familyset>
