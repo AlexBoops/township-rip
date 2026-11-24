@@ -131,6 +131,24 @@
   });
   setInterval(ensureHudMounted, 500);
 
+  // Strip duplicate ".gz.gz" suffix so *.wasm.gz and *.bin.gz requests hit the actual file
+  const origFetch = window.fetch.bind(window);
+  function normalizeGzUrl(input) {
+    if (typeof input === "string") {
+      return input.replace(/(\.gz)\.gz(?=$|\?|#)/i, "$1");
+    }
+    if (input instanceof Request) {
+      const fixedUrl = input.url.replace(/(\.gz)\.gz(?=$|\?|#)/i, "$1");
+      if (fixedUrl !== input.url) {
+        return new Request(fixedUrl, input);
+      }
+    }
+    return input;
+  }
+  window.fetch = function (input, init) {
+    return origFetch(normalizeGzUrl(input), init);
+  };
+
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(function () {});
   }
