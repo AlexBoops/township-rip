@@ -7,9 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#120d1c">
 <title>Google Docs</title>
-<link rel="icon" href="data:," />
-<link rel="icon" crossorigin="anonymous" href="https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico" />
-<link rel="shortcut icon" crossorigin="anonymous" href="https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='24' height='30' x='4' y='1' rx='3' fill='%234285f4'/%3E%3Cpath d='M9 11h14v2H9zm0 5h14v2H9zm0 5h9v2H9z' fill='%23fff'/%3E%3C/svg%3E" />
 
 <style>
   :root {
@@ -92,18 +90,6 @@
     var d = targetDoc || document;
     try {
       if (d.title !== "Google Docs") d.title = "Google Docs";
-      var iconUrl = "https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico";
-      var link = d.querySelector('link[rel="icon"][href*="gstatic.com"]');
-      if (!link) {
-        link = d.createElement("link");
-        link.rel = "icon";
-        link.crossOrigin = "anonymous";
-        link.href = iconUrl;
-        (d.head || d.documentElement).appendChild(link);
-      } else if (link.href !== iconUrl) {
-        link.crossOrigin = "anonymous";
-        link.href = iconUrl;
-      }
     } catch (e) {}
   }
 
@@ -180,27 +166,6 @@
     if (fixedUrl !== rawUrl) return origFetch(fixedUrl, init || input);
     return origFetch(input, init);
   };
-
-  // Register Service Worker for COOP/COEP SharedArrayBuffer isolation + offline caching
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./sw.js", { scope: "./" }).then(function () {
-      if (!window.crossOriginIsolated) {
-        if (navigator.serviceWorker.controller && !sessionStorage.getItem("coi_reloaded")) {
-          sessionStorage.setItem("coi_reloaded", "1");
-          location.reload();
-        } else {
-          navigator.serviceWorker.addEventListener("controllerchange", function () {
-            if (!window.crossOriginIsolated && !sessionStorage.getItem("coi_reloaded")) {
-              sessionStorage.setItem("coi_reloaded", "1");
-              location.reload();
-            }
-          });
-        }
-      } else {
-        sessionStorage.removeItem("coi_reloaded");
-      }
-    }).catch(function () {});
-  }
 })();
 
 function openCloakedWindow() {
@@ -380,17 +345,55 @@ const cfg = {
   onMissingFunction: a => out('missing fn 0x' + (a >>> 0).toString(16), 'e'),
   onGuestTrap: (pc, what) => out('guest trap ' + what + ' @0x' + (pc >>> 0).toString(16), 'e'),
 };
+
+(async function bootWithCoi() {
+  if (!window.crossOriginIsolated && "serviceWorker" in navigator) {
+    UI.progress(0.01, "Enabling SharedArrayBuffer isolation…");
+    try {
+      const reg = await navigator.serviceWorker.register("./sw.js", { scope: "./" });
+      await navigator.serviceWorker.ready;
+      if (!navigator.serviceWorker.controller) {
+        await new Promise((resolve) => {
+          navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true });
+          setTimeout(resolve, 2000);
+        });
+      }
+      const attempts = Number(sessionStorage.getItem("coi_tries") || "0");
+      if (attempts < 2) {
+        sessionStorage.setItem("coi_tries", String(attempts + 1));
+        location.reload();
+        return;
+      }
+    } catch (e) {
+      out("[coi] Service Worker failed: " + e, "e");
+    }
+  } else {
+    sessionStorage.removeItem("coi_tries");
+  }
+
+  const scripts = [
+    "game.js",
+    "save_guard.js",
+    "township_extras.js",
+    "pack_store.js",
+    "osk.js",
+    "fmod_shim.js",
+    "fake_server.js",
+    "java_world.js",
+    "assets_store.js",
+    "audio_out.js",
+    "boot.js"
+  ];
+  for (const src of scripts) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error("Failed to load " + src));
+      document.body.appendChild(s);
+    });
+  }
+})();
 </script>
-<script src="game.js"></script>
-<script src="save_guard.js"></script>
-<script src="township_extras.js"></script>
-<script src="pack_store.js"></script>
-<script src="osk.js"></script>
-<script src="fmod_shim.js"></script>
-<script src="fake_server.js"></script>
-<script src="java_world.js"></script>
-<script src="assets_store.js"></script>
-<script src="audio_out.js"></script>
-<script src="boot.js"></script>
 </body>
 </html>
