@@ -1,8 +1,9 @@
-const CACHE_NAME = "township-ghpages-v2";
+const CACHE_NAME = "township-ghpages-v3";
 
 const CHUNKED_FILES = {
   "assets.data": 18,
-  "image.bin.gz": 2
+  "image.bin.gz": 2,
+  "game.wasm.gz": 3
 };
 
 self.addEventListener("install", (event) => {
@@ -95,42 +96,49 @@ async function buildMergedChunkResponse(relName, partCount, headOnly = false) {
   return fullRes;
 }
 
-async function handleWasmRequest(request) {
+async function handleWasmRequest(request, relPath) {
   const cache = await caches.open(CACHE_NAME);
   const cached = await cache.match(request);
   if (cached) return cached;
 
-  let lastErr;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const res = await fetch(request.url, { cache: "no-store" });
-      if (!res.ok) throw new Error(`HTTP ${res.status} for ${request.url}`);
-      let buf = await res.arrayBuffer();
-      const u8 = new Uint8Array(buf);
-
-      if (u8.length >= 2 && u8[0] === 0x1f && u8[1] === 0x8b && typeof DecompressionStream !== "undefined") {
-        const ds = new DecompressionStream("gzip");
-        buf = await new Response(new Blob([buf]).stream().pipeThrough(ds)).arrayBuffer();
-      }
-
-      const outRes = new Response(buf, {
-        status: 200,
-        headers: {
-          "Content-Type": "application/wasm",
-          "Content-Length": String(buf.byteLength)
-        }
-      });
-
+  let buf;
+  if (Object.prototype.hasOwnProperty.call(CHUNKED_FILES, relPath)) {
+    const mergedRes = await buildMergedChunkResponse(relPath, CHUNKED_FILES[relPath], false);
+    buf = await mergedRes.arrayBuffer();
+  } else {
+    let lastErr;
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        await cache.put(request, outRes.clone());
-      } catch (e) {}
-      return outRes;
-    } catch (err) {
-      lastErr = err;
-      await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+        const res = await fetch(request.url, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status} for ${request.url}`);
+        buf = await res.arrayBuffer();
+        break;
+      } catch (err) {
+        lastErr = err;
+        await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+      }
     }
+    if (!buf) throw lastErr;
   }
-  throw lastErr;
+
+  const u8 = new Uint8Array(buf);
+  if (u8.length >= 2 && u8[0] === 0x1f && u8[1] === 0x8b && typeof DecompressionStream !== "undefined") {
+    const ds = new DecompressionStream("gzip");
+    buf = await new Response(new Blob([buf]).stream().pipeThrough(ds)).arrayBuffer();
+  }
+
+  const outRes = new Response(buf, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/wasm",
+      "Content-Length": String(buf.byteLength)
+    }
+  });
+
+  try {
+    await cache.put(request, outRes.clone());
+  } catch (e) {}
+  return outRes;
 }
 
 self.addEventListener("fetch", (event) => {
@@ -147,14 +155,17 @@ self.addEventListener("fetch", (event) => {
     : url.pathname.replace(/^\/+/, "");
 
   const handler = (async () => {
+    if (/\.wasm(?:\.gz)?$/i.test(relPath)) {
+      if (method === "HEAD") {
+        return await buildMergedChunkResponse(relPath, CHUNKED_FILES[relPath] || 1, true);
+      }
+      return await handleWasmRequest(req, relPath);
+    }
     if (Object.prototype.hasOwnProperty.call(CHUNKED_FILES, relPath)) {
       return await buildMergedChunkResponse(relPath, CHUNKED_FILES[relPath], method === "HEAD");
     }
     if (method === "HEAD") {
       return await fetch(req);
-    }
-    if (/\.wasm(?:\.gz)?$/i.test(relPath)) {
-      return await handleWasmRequest(req);
     }
     const cached = await caches.match(req);
     if (cached) return cached;
