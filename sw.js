@@ -1,4 +1,4 @@
-const CACHE_NAME = "township-ghpages-v1";
+const CACHE_NAME = "township-ghpages-v2";
 
 const CHUNKED_FILES = {
   "assets.data": 18,
@@ -52,32 +52,47 @@ async function fetchPartWithRetry(partUrl, retries = 3) {
   throw lastErr;
 }
 
-async function handleChunkedRequest(relName, partCount) {
+async function buildMergedChunkResponse(relName, partCount, headOnly = false) {
   const cache = await caches.open(CACHE_NAME);
   const cacheKey = new Request(new URL(`./${relName}`, self.registration.scope).href);
   const cached = await cache.match(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    if (!headOnly) return cached;
+    const len = cached.headers.get("Content-Length") || String(cached.size || 0);
+    return new Response(null, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Content-Length": len
+      }
+    });
+  }
 
   const buffers = [];
+  let totalBytes = 0;
   for (let i = 1; i <= partCount; i++) {
     const suffix = String(i).padStart(4, "0");
     const partUrl = new URL(`./${relName}.part${suffix}`, self.registration.scope).href;
-    buffers.push(await fetchPartWithRetry(partUrl));
+    const ab = await fetchPartWithRetry(partUrl);
+    totalBytes += ab.byteLength;
+    buffers.push(ab);
   }
 
   const mergedBlob = new Blob(buffers, { type: "application/octet-stream" });
-  const response = new Response(mergedBlob, {
-    status: 200,
-    headers: {
-      "Content-Type": "application/octet-stream",
-      "Content-Length": String(mergedBlob.size)
-    }
-  });
+  const headers = {
+    "Content-Type": "application/octet-stream",
+    "Content-Length": String(mergedBlob.size || totalBytes)
+  };
 
+  const fullRes = new Response(mergedBlob, { status: 200, headers });
   try {
-    await cache.put(cacheKey, response.clone());
+    await cache.put(cacheKey, fullRes.clone());
   } catch (e) {}
-  return response;
+
+  if (headOnly) {
+    return new Response(null, { status: 200, headers });
+  }
+  return fullRes;
 }
 
 async function handleWasmRequest(request) {
@@ -120,7 +135,8 @@ async function handleWasmRequest(request) {
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
-  if (req.method !== "GET") return;
+  const method = req.method.toUpperCase();
+  if (method !== "GET" && method !== "HEAD") return;
 
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
@@ -132,7 +148,10 @@ self.addEventListener("fetch", (event) => {
 
   const handler = (async () => {
     if (Object.prototype.hasOwnProperty.call(CHUNKED_FILES, relPath)) {
-      return await handleChunkedRequest(relPath, CHUNKED_FILES[relPath]);
+      return await buildMergedChunkResponse(relPath, CHUNKED_FILES[relPath], method === "HEAD");
+    }
+    if (method === "HEAD") {
+      return await fetch(req);
     }
     if (/\.wasm(?:\.gz)?$/i.test(relPath)) {
       return await handleWasmRequest(req);
