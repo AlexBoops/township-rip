@@ -131,57 +131,21 @@
   });
   setInterval(ensureHudMounted, 500);
 
-  // Register Service Worker on GitHub Pages and wait for controller on first visit
-  window.__tsSwReady = (async function () {
-    if (!("serviceWorker" in navigator)) return false;
-    try {
-      const reg = await navigator.serviceWorker.register("./sw.js", { scope: "./" });
-      if (navigator.serviceWorker.controller) return true;
-      await new Promise((resolve) => {
-        const timer = setTimeout(resolve, 2500);
-        navigator.serviceWorker.addEventListener(
-          "controllerchange",
-          () => {
-            clearTimeout(timer);
-            resolve();
-          },
-          { once: true }
-        );
-      });
-      return Boolean(reg);
-    } catch (e) {
-      return false;
-    }
-  })();
-
-  if (typeof WebAssembly !== "undefined") {
-    const origInstantiate = WebAssembly.instantiate.bind(WebAssembly);
-    const origCompile = WebAssembly.compile.bind(WebAssembly);
-
-    async function resolveWasmBuffer(source) {
-      const res = await Promise.resolve(source);
-      if (res instanceof Response) {
-        let buf = await res.arrayBuffer();
-        const u8 = new Uint8Array(buf);
-        if (u8.length >= 2 && u8[0] === 0x1f && u8[1] === 0x8b && typeof DecompressionStream !== "undefined") {
-          const ds = new DecompressionStream("gzip");
-          buf = await new Response(new Blob([buf]).stream().pipeThrough(ds)).arrayBuffer();
-        }
-        return buf;
-      }
-      return res;
-    }
-
-    WebAssembly.instantiateStreaming = async function (source, importObject) {
-      const buf = await resolveWasmBuffer(source);
-      return origInstantiate(buf, importObject);
-    };
-
-    WebAssembly.compileStreaming = async function (source) {
-      const buf = await resolveWasmBuffer(source);
-      return origCompile(buf);
-    };
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(function () {});
   }
+
+  window.__tsMaybeInflateGzip = async function (bufferLike) {
+    const rawBuf = bufferLike instanceof ArrayBuffer
+      ? bufferLike
+      : (bufferLike && bufferLike.buffer ? bufferLike.buffer : await new Response(bufferLike).arrayBuffer());
+    const u8 = new Uint8Array(rawBuf);
+    if (u8.length >= 2 && u8[0] === 0x1f && u8[1] === 0x8b && typeof DecompressionStream !== "undefined") {
+      const ds = new DecompressionStream("gzip");
+      return await new Response(new Blob([rawBuf]).stream().pipeThrough(ds)).arrayBuffer();
+    }
+    return rawBuf;
+  };
 })();
 
 function openCloakedWindow() {
@@ -360,6 +324,47 @@ const cfg = {
   locateFile: p => p,
   onMissingFunction: a => out('missing fn 0x' + (a >>> 0).toString(16), 'e'),
   onGuestTrap: (pc, what) => out('guest trap ' + what + ' @0x' + (pc >>> 0).toString(16), 'e'),
+  instantiateWasm: (imports, receive) => {
+    (async () => {
+      const MB = n => (n / 1048576).toFixed(n < 10485760 ? 1 : 0);
+      const onProgress = m => {
+        if (m.type === 'inflate') { UI.progress(0.57, 'Unpacking game code…'); return; }
+        const f = m.total ? m.have / m.total : 0;
+        UI.progress(0.02 + 0.55 * f, (m.type === 'retry' ? 'Connection lost, resuming… ' : 'Downloading game code ') + `${MB(m.have)} / ${MB(m.total)} MB`);
+      };
+
+      let rawBuffer = null;
+      if (window.AssetStore && typeof AssetStore.bytes === "function") {
+        try {
+          const bytes = await AssetStore.bytes('game.wasm', onProgress);
+          if (bytes) rawBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+        } catch (e) {}
+      }
+
+      if (!rawBuffer) {
+        let resp = null;
+        if (window.AssetStore && typeof AssetStore.response === "function") {
+          try { resp = await AssetStore.response('game.wasm', 'application/wasm', onProgress); } catch (e) {}
+        }
+        if (!resp || !resp.ok) {
+          resp = await fetch('game.wasm', { cache: 'no-store' });
+        }
+        if (!resp.ok) {
+          throw new Error('HTTP ' + resp.status + ' fetching game.wasm');
+        }
+        rawBuffer = await resp.arrayBuffer();
+      }
+
+      UI.progress(0.58, 'Compiling game code…');
+      const wasmBytes = await window.__tsMaybeInflateGzip(rawBuffer);
+      const { instance, module } = await WebAssembly.instantiate(wasmBytes, imports);
+      receive(instance, module);
+    })().catch(e => {
+      console.error(e);
+      UI.fail('Could not load the game code: ' + (e && e.message ? e.message : e));
+    });
+    return {};
+  }
 };
 </script>
 <script src="game.js"></script>
