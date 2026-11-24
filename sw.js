@@ -1,4 +1,4 @@
-const CACHE_NAME = "township-ghpages-v4";
+const CACHE_NAME = "township-ghpages-v5";
 
 const CHUNKED_FILES = {
   "assets.data": 18,
@@ -8,16 +8,16 @@ const CHUNKED_FILES = {
 
 const COI_HEADERS = {
   "Cross-Origin-Opener-Policy": "same-origin",
-  "Cross-Origin-Embedder-Policy": "credentialless",
+  "Cross-Origin-Embedder-Policy": "require-corp",
   "Cross-Origin-Resource-Policy": "cross-origin"
 };
 
 function withCoiHeaders(response) {
   if (!response || response.status === 0 || response.type === "opaque") return response;
   const headers = new Headers(response.headers);
-  headers.set("Cross-Origin-Opener-Policy", COI_HEADERS["Cross-Origin-Opener-Policy"]);
-  headers.set("Cross-Origin-Embedder-Policy", COI_HEADERS["Cross-Origin-Embedder-Policy"]);
-  headers.set("Cross-Origin-Resource-Policy", COI_HEADERS["Cross-Origin-Resource-Policy"]);
+  headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  headers.set("Cross-Origin-Embedder-Policy", "require-corp");
+  headers.set("Cross-Origin-Resource-Policy", "cross-origin");
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -27,33 +27,13 @@ function withCoiHeaders(response) {
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) =>
-      cache.addAll([
-        "./",
-        "./index.html",
-        "./township.png",
-        "./game.js",
-        "./save_guard.js",
-        "./township_extras.js",
-        "./pack_store.js",
-        "./osk.js",
-        "./fmod_shim.js",
-        "./fake_server.js",
-        "./java_world.js",
-        "./assets_store.js",
-        "./audio_out.js",
-        "./boot.js"
-      ]).catch(() => {})
-    )
-  );
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
 });
 
@@ -111,9 +91,7 @@ async function buildMergedChunkResponse(relName, partCount, headOnly = false) {
     await cache.put(cacheKey, fullRes.clone());
   } catch (e) {}
 
-  if (headOnly) {
-    return new Response(null, { status: 200, headers });
-  }
+  if (headOnly) return new Response(null, { status: 200, headers });
   return fullRes;
 }
 
@@ -127,19 +105,9 @@ async function handleWasmRequest(request, relPath) {
     const mergedRes = await buildMergedChunkResponse(relPath, CHUNKED_FILES[relPath], false);
     buf = await mergedRes.arrayBuffer();
   } else {
-    let lastErr;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const res = await fetch(request.url, { cache: "no-store" });
-        if (!res.ok) throw new Error(`HTTP ${res.status} for ${request.url}`);
-        buf = await res.arrayBuffer();
-        break;
-      } catch (err) {
-        lastErr = err;
-        await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
-      }
-    }
-    if (!buf) throw lastErr;
+    const res = await fetch(request.url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status} for ${request.url}`);
+    buf = await res.arrayBuffer();
   }
 
   const u8 = new Uint8Array(buf);
@@ -189,8 +157,6 @@ self.addEventListener("fetch", (event) => {
     if (method === "HEAD") {
       return withCoiHeaders(await fetch(req));
     }
-    const cached = await caches.match(req);
-    if (cached) return withCoiHeaders(cached);
     const netRes = await fetch(req);
     return withCoiHeaders(netRes);
   })();
