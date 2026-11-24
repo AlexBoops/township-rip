@@ -1,10 +1,29 @@
-const CACHE_NAME = "township-ghpages-v3";
+const CACHE_NAME = "township-ghpages-v4";
 
 const CHUNKED_FILES = {
   "assets.data": 18,
   "image.bin.gz": 2,
   "game.wasm.gz": 3
 };
+
+const COI_HEADERS = {
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Embedder-Policy": "credentialless",
+  "Cross-Origin-Resource-Policy": "cross-origin"
+};
+
+function withCoiHeaders(response) {
+  if (!response || response.status === 0 || response.type === "opaque") return response;
+  const headers = new Headers(response.headers);
+  headers.set("Cross-Origin-Opener-Policy", COI_HEADERS["Cross-Origin-Opener-Policy"]);
+  headers.set("Cross-Origin-Embedder-Policy", COI_HEADERS["Cross-Origin-Embedder-Policy"]);
+  headers.set("Cross-Origin-Resource-Policy", COI_HEADERS["Cross-Origin-Resource-Policy"]);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -58,11 +77,12 @@ async function buildMergedChunkResponse(relName, partCount, headOnly = false) {
   const cacheKey = new Request(new URL(`./${relName}`, self.registration.scope).href);
   const cached = await cache.match(cacheKey);
   if (cached) {
-    if (!headOnly) return cached;
+    if (!headOnly) return withCoiHeaders(cached);
     const len = cached.headers.get("Content-Length") || String(cached.size || 0);
     return new Response(null, {
       status: 200,
       headers: {
+        ...COI_HEADERS,
         "Content-Type": "application/octet-stream",
         "Content-Length": len
       }
@@ -81,6 +101,7 @@ async function buildMergedChunkResponse(relName, partCount, headOnly = false) {
 
   const mergedBlob = new Blob(buffers, { type: "application/octet-stream" });
   const headers = {
+    ...COI_HEADERS,
     "Content-Type": "application/octet-stream",
     "Content-Length": String(mergedBlob.size || totalBytes)
   };
@@ -99,7 +120,7 @@ async function buildMergedChunkResponse(relName, partCount, headOnly = false) {
 async function handleWasmRequest(request, relPath) {
   const cache = await caches.open(CACHE_NAME);
   const cached = await cache.match(request);
-  if (cached) return cached;
+  if (cached) return withCoiHeaders(cached);
 
   let buf;
   if (Object.prototype.hasOwnProperty.call(CHUNKED_FILES, relPath)) {
@@ -130,6 +151,7 @@ async function handleWasmRequest(request, relPath) {
   const outRes = new Response(buf, {
     status: 200,
     headers: {
+      ...COI_HEADERS,
       "Content-Type": "application/wasm",
       "Content-Length": String(buf.byteLength)
     }
@@ -165,11 +187,12 @@ self.addEventListener("fetch", (event) => {
       return await buildMergedChunkResponse(relPath, CHUNKED_FILES[relPath], method === "HEAD");
     }
     if (method === "HEAD") {
-      return await fetch(req);
+      return withCoiHeaders(await fetch(req));
     }
     const cached = await caches.match(req);
-    if (cached) return cached;
-    return await fetch(req);
+    if (cached) return withCoiHeaders(cached);
+    const netRes = await fetch(req);
+    return withCoiHeaders(netRes);
   })();
 
   event.respondWith(
@@ -177,7 +200,8 @@ self.addEventListener("fetch", (event) => {
       console.error("[SW Fetch Failed]", relPath, err);
       return new Response(String(err && err.message ? err.message : err), {
         status: 502,
-        statusText: "Service Worker Fetch Error"
+        statusText: "Service Worker Fetch Error",
+        headers: COI_HEADERS
       });
     })
   );
