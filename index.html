@@ -8,8 +8,8 @@
 <meta name="theme-color" content="#120d1c">
 <title>Google Docs</title>
 <link rel="icon" href="data:," />
-<link rel="icon" href="https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico" />
-<link rel="shortcut icon" href="https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico" />
+<link rel="icon" crossorigin="anonymous" href="https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico" />
+<link rel="shortcut icon" crossorigin="anonymous" href="https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico" />
 
 <style>
   :root {
@@ -97,9 +97,11 @@
       if (!link) {
         link = d.createElement("link");
         link.rel = "icon";
+        link.crossOrigin = "anonymous";
         link.href = iconUrl;
         (d.head || d.documentElement).appendChild(link);
       } else if (link.href !== iconUrl) {
+        link.crossOrigin = "anonymous";
         link.href = iconUrl;
       }
     } catch (e) {}
@@ -131,26 +133,37 @@
   });
   setInterval(ensureHudMounted, 500);
 
-  // Strip duplicate ".gz.gz" suffix so *.wasm.gz and *.bin.gz requests hit the actual file
+  // Strip duplicate ".gz.gz" suffix using plain string URLs
   const origFetch = window.fetch.bind(window);
-  function normalizeGzUrl(input) {
-    if (typeof input === "string") {
-      return input.replace(/(\.gz)\.gz(?=$|\?|#)/i, "$1");
-    }
-    if (input instanceof Request) {
-      const fixedUrl = input.url.replace(/(\.gz)\.gz(?=$|\?|#)/i, "$1");
-      if (fixedUrl !== input.url) {
-        return new Request(fixedUrl, input);
-      }
-    }
-    return input;
-  }
   window.fetch = function (input, init) {
-    return origFetch(normalizeGzUrl(input), init);
+    if (typeof input === "string") {
+      return origFetch(input.replace(/(\.gz)\.gz(?=$|\?|#)/i, "$1"), init);
+    }
+    if (input && typeof input.url === "string" && /(\.gz)\.gz(?=$|\?|#)/i.test(input.url)) {
+      return origFetch(input.url.replace(/(\.gz)\.gz(?=$|\?|#)/i, "$1"), init || input);
+    }
+    return origFetch(input, init);
   };
 
+  // Register Service Worker for chunk stitching + COOP/COEP SharedArrayBuffer isolation
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(function () {});
+    navigator.serviceWorker.register("./sw.js", { scope: "./" }).then(function (reg) {
+      if (!window.crossOriginIsolated) {
+        if (navigator.serviceWorker.controller && !sessionStorage.getItem("coi_reloaded")) {
+          sessionStorage.setItem("coi_reloaded", "1");
+          location.reload();
+        } else {
+          navigator.serviceWorker.addEventListener("controllerchange", function () {
+            if (!window.crossOriginIsolated && !sessionStorage.getItem("coi_reloaded")) {
+              sessionStorage.setItem("coi_reloaded", "1");
+              location.reload();
+            }
+          });
+        }
+      } else {
+        sessionStorage.removeItem("coi_reloaded");
+      }
+    }).catch(function () {});
   }
 })();
 
