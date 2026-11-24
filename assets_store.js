@@ -1,53 +1,111 @@
 // Offline file store for the big downloads (game.wasm, image.bin, assets.data).
-// Each file is downloaded once (resumable after a dropped connection), kept on disk
-// in the browser's private file system (OPFS) and only fetched again when the server
-// copy changes. Game assets inside assets.data are then read on demand; only recently
-// used files stay in RAM (LRU). Without OPFS everything falls back to plain downloads.
+// Streams split .part0001..N chunks directly into OPFS one part at a time so GitHub Pages
+// never stalls on 300+ MB single-file buffers or Range headers.
 (() => {
   const WORKER_SRC = `
+    const CHUNK_COUNTS = {
+      'assets.data': 18,
+      'image.bin.gz': 2,
+      'game.wasm.gz': 3
+    };
+
     let root = null;
     async function getRoot() { return root || (root = await navigator.storage.getDirectory()); }
-    // a file another page still holds (a reload, a second tab) frees up shortly: wait for it
+
     async function accessHandle(fh, mode) {
       for (let i = 0; ; i++) {
         try { return mode ? await fh.createSyncAccessHandle({mode}) : await fh.createSyncAccessHandle(); }
         catch (e) {
-          if (mode && e instanceof TypeError) return fh.createSyncAccessHandle();   // no read-only mode in this browser
+          if (mode && e instanceof TypeError) return fh.createSyncAccessHandle();
           if (e.name !== 'NoModificationAllowedError' || i >= 40) throw e;
           await new Promise(res => setTimeout(res, 250));
         }
       }
     }
+
     async function readOk(name) {
       try { return await (await (await (await getRoot()).getFileHandle(name + '.ok')).getFile()).text(); } catch (e) { return null; }
     }
+
     async function sizeOf(name) {
       try { return (await (await (await getRoot()).getFileHandle(name)).getFile()).size; } catch (e) { return -1; }
     }
+
     async function writeOk(name, tag) {
       const w = await (await (await getRoot()).getFileHandle(name + '.ok', {create: true})).createWritable();
       await w.write(tag); await w.close();
     }
+
+    function fileNameFromUrl(url) {
+      return new URL(url).pathname.split('/').pop();
+    }
+
+    async function fetchPart(partUrl) {
+      const resp = await fetch(partUrl, { cache: 'no-store' });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status + ' for ' + partUrl);
+      return resp;
+    }
+
     async function ensure(m, post) {
       const r = await getRoot();
-      const tag = m.total + ':' + m.version;
+      const baseFile = fileNameFromUrl(m.url);
+      const partCount = CHUNK_COUNTS[baseFile] || 0;
+      const tag = partCount ? ('parts:' + partCount + ':' + m.version) : (m.total + ':' + m.version);
       const old = await readOk(m.name);
-      if (old === tag && await sizeOf(m.name) === m.total) return;   // tag and data both present
+
+      if (old === tag && await sizeOf(m.name) > 0 && (!partCount ? await sizeOf(m.name) === m.total : true)) {
+        return;
+      }
       if (old !== null) { try { await r.removeEntry(m.name + '.ok'); } catch (e) {} }
+
       const fh = await r.getFileHandle(m.name, {create: true});
       const h = await accessHandle(fh);
       try {
-        // a partial file from an interrupted download is resumed only if it is the same version
-        const partTag = await readOk(m.name + '.part');
-        let have = partTag === tag ? h.getSize() : 0;
-        if (have === 0 || have > m.total) { h.truncate(0); have = 0; }
-        await writeOk(m.name + '.part', tag);
-        let tries = 0, since = 0;
+        h.truncate(0);
+        let have = 0, tries = 0, since = 0;
+
+        if (partCount > 0) {
+          const estTotal = m.total || (partCount * 19 * 1048576);
+          for (let partIdx = 1; partIdx <= partCount; ) {
+            const partUrl = m.url + '.part' + String(partIdx).padStart(4, '0');
+            try {
+              const resp = await fetchPart(partUrl);
+              const rd = resp.body.getReader();
+              for (;;) {
+                const {done, value} = await rd.read();
+                if (done) break;
+                h.write(value, {at: have});
+                have += value.byteLength;
+                since += value.byteLength;
+                if (since >= (1 << 20)) {
+                  since = 0;
+                  h.flush();
+                  post({type: 'progress', id: m.id, have, total: Math.max(estTotal, have)});
+                }
+              }
+              h.flush();
+              tries = 0;
+              partIdx++;
+            } catch (e) {
+              h.flush();
+              post({type: 'retry', id: m.id, have, total: Math.max(estTotal, have), error: String(e), tries: ++tries});
+              if (tries > 15) throw e;
+              await new Promise(res => setTimeout(res, Math.min(5000, 500 * tries)));
+            }
+          }
+          h.truncate(have);
+          h.flush();
+          await writeOk(m.name, tag);
+          post({type: 'progress', id: m.id, have, total: have});
+          return;
+        }
+
+        // Non-chunked fallback
         while (have < m.total) {
           try {
-            const resp = await fetch(m.url, {headers: {Range: 'bytes=' + have + '-'}, cache: 'no-store'});
-            if (resp.status !== 206 && resp.status !== 200) throw new Error('HTTP ' + resp.status);
-            if (resp.status === 200 && have > 0) { h.truncate(0); have = 0; }
+            const resp = await fetch(m.url, {cache: 'no-store'});
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            h.truncate(0); have = 0;
             const rd = resp.body.getReader();
             for (;;) {
               const {done, value} = await rd.read();
@@ -60,23 +118,27 @@
           } catch (e) {
             h.flush();
             post({type: 'retry', id: m.id, have, total: m.total, error: String(e), tries: ++tries});
-            await new Promise(res => setTimeout(res, Math.min(15000, 1000 * tries)));
+            if (tries > 15) throw e;
+            await new Promise(res => setTimeout(res, Math.min(5000, 500 * tries)));
           }
         }
         h.truncate(m.total);
         h.flush();
       } finally { h.close(); }
+
       await writeOk(m.name, tag);
       try { await r.removeEntry(m.name + '.part.ok'); } catch (e) {}
       post({type: 'progress', id: m.id, have: m.total, total: m.total});
     }
-    // download name.gz (resumable), inflate it once into m.out, then drop the compressed copy
+
     async function ensureGz(m, post) {
       const r = await getRoot();
-      const tag = m.total + ':' + m.version;
+      const baseFile = fileNameFromUrl(m.url);
+      const partCount = CHUNK_COUNTS[baseFile] || 0;
+      const tag = partCount ? ('parts:' + partCount + ':' + m.version) : (m.total + ':' + m.version);
       const have = await readOk(m.out);
       if (have && have.startsWith(tag + '|') && await sizeOf(m.out) === +have.slice(tag.length + 1)) return;
-      if (await sizeOf(m.name) !== m.total) { try { await r.removeEntry(m.name + '.ok'); } catch (e) {} }
+      if (!partCount && await sizeOf(m.name) !== m.total) { try { await r.removeEntry(m.name + '.ok'); } catch (e) {} }
       await ensure(m, post);
       post({type: 'inflate', id: m.id});
       const src = await (await r.getFileHandle(m.name)).getFile();
@@ -97,14 +159,13 @@
       await writeOk(m.out, tag + '|' + outSize);
       for (const n of [m.name, m.name + '.ok', m.name + '.part.ok']) { try { await r.removeEntry(n); } catch (e) {} }
     }
+
     async function serve(m) {
-      // shared read-only access: other pages (a reload, another tab) can read it too
       const h = await accessHandle(await (await getRoot()).getFileHandle(m.name), 'read-only');
-      // the request block lives in the game's shared memory, so C threads can use it too
       const c = new Int32Array(m.mem, m.ctl, 8), buf = new Uint8Array(m.mem, m.data, m.dataLen);
       const tmp = new Uint8Array(m.dataLen);
       postMessage({type: 'done', id: m.id});
-      for (;;) {                       // c[0]: 1 request, 2 done, 3 error; c[1] offset, c[2] length, c[3] read
+      for (;;) {
         Atomics.wait(c, 0, 0);
         if (Atomics.load(c, 0) !== 1) continue;
         try {
@@ -116,6 +177,7 @@
         Atomics.notify(c, 0);
       }
     }
+
     onmessage = async ev => {
       const m = ev.data;
       try {
@@ -126,8 +188,14 @@
       } catch (e) { postMessage({type: 'fail', id: m.id, error: String(e)}); }
     };`;
 
-  const READ_MAX = 8 << 20;          // per read request; larger files are read in pieces
-  const CACHE_MAX = 64 << 20;        // bytes of asset files kept in RAM
+  const CHUNK_COUNTS = {
+    'assets.data': 18,
+    'image.bin.gz': 2,
+    'game.wasm.gz': 3
+  };
+
+  const READ_MAX = 8 << 20;
+  const CACHE_MAX = 64 << 20;
 
   let worker = null, nextId = 1;
   const pending = new Map();
@@ -149,56 +217,68 @@
     });
   }
 
-  // (FileSystemSyncAccessHandle exists only inside workers, so it can't be checked here;
-  //  if the worker can't use it, its calls fail and we fall back to downloads)
   const opfsOk = !!(navigator.storage && navigator.storage.getDirectory && typeof SharedArrayBuffer !== 'undefined');
 
   async function head(url) {
+    const clean = url.replace(/(\.gz)\.gz(?=$|\?|#)/i, '$1');
+    const fileName = new URL(clean, location.href).pathname.split('/').pop();
+    if (Object.prototype.hasOwnProperty.call(CHUNK_COUNTS, fileName)) {
+      try {
+        const h = await fetch(clean + '.part0001', {method: 'HEAD', cache: 'no-store'});
+        if (h.ok) {
+          return {
+            total: CHUNK_COUNTS[fileName] * 19 * 1048576,
+            version: h.headers.get('Last-Modified') || h.headers.get('ETag') || 'v1'
+          };
+        }
+      } catch (e) {}
+      return null;
+    }
     try {
-      const h = await fetch(url, {method: 'HEAD', cache: 'no-store'});
+      const h = await fetch(clean, {method: 'HEAD', cache: 'no-store'});
       if (h.ok) return {total: +h.headers.get('Content-Length') || 0, version: h.headers.get('Last-Modified') || h.headers.get('ETag') || ''};
-    } catch (e) { /* offline */ }
+    } catch (e) {}
     return null;
   }
 
-  // Make sure `url` is stored on disk and current; returns its File, or null without OPFS.
-  // If `url`.gz exists on the server, that is downloaded instead and inflated on disk.
   let persistAsked = false;
   async function cachedFile(url, onProgress) {
     if (!opfsOk) return null;
-    if (!persistAsked) {               // big stored downloads: ask the browser not to evict them
+    if (!persistAsked) {
       persistAsked = true;
       try { if (navigator.storage.persist && !(await navigator.storage.persisted())) await navigator.storage.persist(); } catch (e) {}
     }
-    const base = url.replace(/[^\w.-]/g, '_');
+    const cleanUrl = url.replace(/(\.gz)\.gz(?=$|\?|#)/i, '$1');
+    const isAlreadyGz = /\.gz$/i.test(cleanUrl);
+    const base = cleanUrl.replace(/\.gz$/i, '').replace(/[^\w.-]/g, '_');
     const abs = u => new URL(u, location.href).href;
-    const gz = await head(url + '.gz');
-    let meta = gz && gz.total ? null : await head(url);
-    // A file stays locked when a crashed page (or a hung tab) still holds it: then a second
-    // copy under another name is used instead of falling back to RAM.
+
+    const gzUrl = isAlreadyGz ? cleanUrl : (cleanUrl + '.gz');
+    const gz = await head(gzUrl);
+    let meta = gz && gz.total ? null : (!isAlreadyGz ? await head(cleanUrl) : null);
+
     for (const name of [base, base + '.alt']) {
       try {
         if (gz && gz.total) {
-          await call({cmd: 'ensureGz', name: name + '.gz', out: name, url: abs(url + '.gz'), ...gz}, onProgress);
+          await call({cmd: 'ensureGz', name: name + '.gz', out: name, url: abs(gzUrl), ...gz}, onProgress);
         } else if (!meta || !meta.total) {
-          const t = (await call({cmd: 'tag', name})).tag;    // offline: whatever is stored
+          const t = (await call({cmd: 'tag', name})).tag;
           if (!t) continue;
         } else {
-          await call({cmd: 'ensure', name, url: abs(url), ...meta}, onProgress);
+          await call({cmd: 'ensure', name, url: abs(cleanUrl), ...meta}, onProgress);
         }
         const root = await navigator.storage.getDirectory();
         return {name, file: await (await root.getFileHandle(name)).getFile()};
       } catch (e) {
         if (!/NoModificationAllowed/.test(String(e)) || name !== base) throw e;
-        console.warn('[store] ' + url + ' is locked by another page; using a second copy');
+        console.warn('[store] ' + cleanUrl + ' is locked by another page; using a second copy');
       }
     }
     return null;
   }
 
-  // Build /assets/... in MEMFS with lazily loaded file contents.
   function mountLazy(FS, index, read, onDisk) {
-    const lru = new Map();             // node -> bytes; insertion order = recency
+    const lru = new Map();
     let cached = 0;
     const stats = {reads: 0, bytes: 0, evictions: 0};
     const load = node => {
@@ -234,17 +314,16 @@
     return {stats, cachedBytes: () => cached, clear: () => { lru.clear(); cached = 0; }};
   }
 
-  // plain download (no OPFS); uses url.gz when the server has it
   async function fetchMaybeGz(url) {
-    const g = await fetch(url + '.gz').catch(() => null);
+    const clean = url.replace(/(\.gz)\.gz(?=$|\?|#)/i, '$1');
+    const gzUrl = /\.gz$/i.test(clean) ? clean : (clean + '.gz');
+    const g = await fetch(gzUrl).catch(() => null);
     if (g && g.ok && g.body) return new Response(g.body.pipeThrough(new DecompressionStream('gzip')));
-    return fetch(url);
+    return fetch(clean);
   }
 
-  // One big file (e.g. an engine that reads its APK zip itself): served by ranges
-  // through a block cache, never loaded whole.
   function mountRanged(FS, path, size, read, onDisk) {
-    const BLOCK = 256 << 10, MAXB = onDisk ? 128 : 1 << 30;   // 32 MB of blocks on disk mode
+    const BLOCK = 256 << 10, MAXB = onDisk ? 128 : 1 << 30;
     const blocks = new Map();
     const stats = {reads: 0, bytes: 0, evictions: 0};
     const block = i => {
@@ -270,7 +349,7 @@
     FS.mkdirTree(path.slice(0, slash));
     const node = FS.createFile(path.slice(0, slash), path.slice(slash + 1), null, true, false);
     node.usedBytes = size;
-    Object.defineProperty(node, 'contents', {   // whole-file access (rare): read it all
+    Object.defineProperty(node, 'contents', {
       get() { const b = new Uint8Array(size); readInto(b, 0, 0, size); return b; },
       set(v) {}, configurable: true,
     });
@@ -304,14 +383,13 @@
       const {done, value} = await rd.read();
       if (done) break;
       out.set(value, have); have += value.byteLength;
-      onProgress({type: 'progress', have, total});
+      if (onProgress) onProgress({type: 'progress', have, total});
     }
     return out;
   }
 
   window.AssetStore = {
     opfsOk,
-    // a stored file as a Response (for WebAssembly streaming compile) or null
     async response(url, type, onProgress) {
       try {
         const c = await cachedFile(url, onProgress);
@@ -327,10 +405,7 @@
       } catch (e) { console.warn('[store] ' + url + ':', e); }
       return downloadToMemory(url, onProgress);
     },
-    // assets.data: stored on disk and served file by file; call last (the worker then only serves reads)
     async openAssets(onProgress) {
-      // never a cached index: it holds the byte positions of everything in assets.data, so an
-      // old index with a new assets.data (or the reverse) makes every read land in the wrong place
       const index = await (await fetch('assets_index.json', {cache: 'no-store'})).json();
       let read = null, onDisk = false;
       try {
@@ -339,18 +414,16 @@
           throw new Error(`assets.data is ${c.file.size} bytes but assets_index.json expects ${index.total} ` +
                           '(rebuilt while loading?) - reload the page');
         if (c) {
-          // request block + data buffer in the game's shared memory (see runtime/hle_vfile.c):
-          // [0] state [1] offset [2] length [3] bytes read [4] lock
           const Mod = window.M;
           const ctlPtr = Mod._malloc(32), dataPtr = Mod._malloc(READ_MAX);
           const mem = Mod.wasmMemory.buffer;
           const ctl = new Int32Array(mem, ctlPtr, 8), data = new Uint8Array(mem, dataPtr, READ_MAX);
-          window._apkCtl = ctlPtr;     // debugging: sample [1] offset / [2] length
+          window._apkCtl = ctlPtr;
           ctl.fill(0);
           await call({cmd: 'serve', name: c.name, mem, ctl: ctlPtr, data: dataPtr, dataLen: READ_MAX});
-          read = (offset, len) => {     // synchronous, for the file system on the main thread
+          read = (offset, len) => {
             const out = new Uint8Array(len);
-            while (Atomics.compareExchange(ctl, 4, 0, 1) !== 0) {}      // shared with C threads
+            while (Atomics.compareExchange(ctl, 4, 0, 1) !== 0) {}
             try {
               for (let done = 0; done < len;) {
                 const n = Math.min(READ_MAX, len - done);
@@ -379,7 +452,6 @@
         const all = await downloadToMemory('assets.data', onProgress);
         read = (offset, len) => all.subarray(offset, offset + len);
       }
-      // the content packs bundled after the APK (tools/build_assets.py): name -> [offset, size]
       window.AssetData = { read, packs: index.packs || {} };
       return {index, mode: onDisk ? 'disk' : 'memory',
               mount: FS => index.apk ? mountRanged(FS, index.apk, index.size, read, onDisk) : mountLazy(FS, index, read, onDisk)};
