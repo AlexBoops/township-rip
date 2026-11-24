@@ -81,59 +81,70 @@ async function fetchDirectBytes(url, onProgress, retries = 3) {
 }
 
 async function loadGameWasmBytes(onProgress) {
-  if (window.AssetStore && typeof AssetStore.bytes === 'function') {
-    try {
-      const b = await AssetStore.bytes('game.wasm', onProgress);
-      if (b && b.byteLength > 0) return await maybeInflateGzip(b);
-    } catch (e) {
-      out('[page] AssetStore.bytes(game.wasm) fallback to direct fetch: ' + (e && e.message || e), 'w');
+  const candidates = ['game.wasm.gz', 'game.wasm'];
+
+  for (const name of candidates) {
+    if (window.AssetStore && typeof AssetStore.bytes === 'function') {
+      try {
+        const b = await AssetStore.bytes(name, onProgress);
+        if (b && b.byteLength > 0) {
+          const u8 = b instanceof Uint8Array ? b : new Uint8Array(b);
+          return await maybeInflateGzip(u8);
+        }
+      } catch (e) {}
     }
   }
 
-  if (window.AssetStore && typeof AssetStore.response === 'function') {
-    try {
-      const r = await AssetStore.response('game.wasm', 'application/wasm', onProgress);
-      if (r && r.ok) {
-        const buf = await r.arrayBuffer();
-        if (buf.byteLength > 0) return await maybeInflateGzip(buf);
-      }
-    } catch (e) {
-      out('[page] AssetStore.response(game.wasm) fallback to direct fetch: ' + (e && e.message || e), 'w');
+  for (const name of candidates) {
+    if (window.AssetStore && typeof AssetStore.response === 'function') {
+      try {
+        const r = await AssetStore.response(name, 'application/wasm', onProgress);
+        if (r && r.ok) {
+          const buf = await r.arrayBuffer();
+          if (buf.byteLength > 0) return await maybeInflateGzip(buf);
+        }
+      } catch (e) {}
     }
   }
 
-  // Try game.wasm first, then game.wasm.gz if needed
-  for (const candidate of ['game.wasm', 'game.wasm.gz']) {
+  for (const url of candidates) {
     try {
-      const raw = await fetchDirectBytes(candidate, onProgress);
+      const raw = await fetchDirectBytes(url, onProgress);
       return await maybeInflateGzip(raw);
     } catch (e) {
-      if (candidate === 'game.wasm.gz') throw e;
+      if (url === candidates[candidates.length - 1]) throw e;
     }
   }
-  throw new Error('Could not load game.wasm');
+  throw new Error('Could not load game.wasm.gz');
 }
 
 async function loadImageBytes(onProgress) {
-  if (window.AssetStore && typeof AssetStore.bytes === 'function') {
-    try {
-      const b = await AssetStore.bytes('image.bin', onProgress);
-      if (b && b.byteLength > 0) return await maybeInflateGzip(b);
-    } catch (e) {
-      out('[page] AssetStore.bytes(image.bin) fallback to direct fetch: ' + (e && e.message || e), 'w');
+  const candidates = ['image.bin.gz', 'image.bin'];
+
+  for (const name of candidates) {
+    if (window.AssetStore && typeof AssetStore.bytes === 'function') {
+      try {
+        const b = await AssetStore.bytes(name, onProgress);
+        if (b && b.byteLength > 0) {
+          const u8 = b instanceof Uint8Array ? b : new Uint8Array(b);
+          return await maybeInflateGzip(u8);
+        }
+      } catch (e) {}
     }
   }
-  for (const candidate of ['image.bin', 'image.bin.gz']) {
+
+  for (const url of candidates) {
     try {
-      const raw = await fetchDirectBytes(candidate, onProgress);
+      const raw = await fetchDirectBytes(url, onProgress);
       return await maybeInflateGzip(raw);
     } catch (e) {
-      if (candidate === 'image.bin.gz') throw e;
+      if (url === candidates[candidates.length - 1]) throw e;
     }
   }
-  throw new Error('Could not load image.bin');
+  throw new Error('Could not load image.bin.gz');
 }
 
+// game code: compiled straight from the stored copy, downloaded only when it changed
 cfg.instantiateWasm = (imports, receive) => {
   (async () => {
     const onProgress = progressFor('Downloading game code', 0.02, 0.55);
@@ -188,7 +199,9 @@ window.boot = (async () => {
       FS.mkdirTree(d);
     }
 
-    // Android system fonts
+    // Android system fonts: the engine draws user-typed text (town name box, town sign) with
+    // the phone's fonts, found through /system/etc/fonts.xml. Without them that text is
+    // invisible. Roboto Slab from the game's own APK stands in for Roboto.
     try {
       const [xml, ttf] = await Promise.all(
         ['fonts/system/fonts.xml', 'fonts/system/Roboto-Regular.ttf'].map(u =>
@@ -213,7 +226,10 @@ window.boot = (async () => {
       out('[page] system fonts: ' + e, 'w');
     }
 
+    // saves must survive: ask the browser to never evict this site's storage, keep rolling
+    // backups of the save folder, and restore the newest one if the saves vanished
     if (window.SaveGuard) await SaveGuard.start(FS, DATA_DIR, out);
+    // the game's download folder (content packs) as it was at the end of the last session
     if (window.PackStore && PackStore.restore) {
       try {
         const n = await PackStore.restore(FS);
@@ -223,8 +239,10 @@ window.boot = (async () => {
       }
     }
 
+    // Candy Crush opens assets with relative paths ("res_output/...")
     if (GAME.chdir) FS.chdir(GAME.chdir);
 
+    // save to IndexedDB only after the game changed something under DATA_DIR
     let dirty = false, syncing = false, changedSinceFast = false;
     const inData = p => typeof p === 'string' && p.startsWith(DATA_DIR);
     for (const op of ['write', 'unlink', 'rename', 'mkdir', 'rmdir', 'truncate', 'ftruncate']) {
@@ -267,6 +285,9 @@ window.boot = (async () => {
     if (cfg.java) cfg.java.syncFs = () => sync(true);
     setInterval(sync, 5000);
 
+    // Closing the tab: FS.syncfs is a chain of async steps that a closing page does not
+    // finish, so the save files are written to IDBFS's own database directly, in one
+    // transaction started synchronously from the close event (a connection opened ahead).
     let fastDb = null;
     try {
       const r = indexedDB.open(DATA_DIR);
@@ -312,6 +333,8 @@ window.boot = (async () => {
     addEventListener('visibilitychange', () => { if (document.hidden) saveAndStore(); });
     setInterval(() => { if (!window.TW_HOLD && changedSinceFast) fastSave(); }, 30000);
 
+    // freeze log: a main-thread stall over half a second is written to the log with what the
+    // game was calling just before (the page's own hooks run outside these stalls)
     try {
       new PerformanceObserver(list => {
         for (const e of list.getEntries()) {
@@ -327,6 +350,7 @@ window.boot = (async () => {
       if (!fn) fn = M.ccall('rt_lookup_export', 'number', ['string'], ['Java_' + mangle(cls) + '_' + mangle(name)]);
       return fn >>> 0;
     };
+    // views over linear memory that stay valid after it grows
     M.heap = () => {
       const b = M.wasmMemory.buffer;
       if (!M._h8 || M._h8.buffer !== b) M._h8 = new Uint8Array(b);
@@ -354,6 +378,8 @@ window.boot = (async () => {
     M.envAddr = env;
     M.vmAddr = vm;
 
+    // every library's JNI_OnLoad in load order when the build lists them (jni_onload.json),
+    // else the first one found
     let onloads = null;
     try {
       const r = await fetch('jni_onload.json');
