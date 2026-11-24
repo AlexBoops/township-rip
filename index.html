@@ -133,21 +133,57 @@
   });
   setInterval(ensureHudMounted, 500);
 
-  // Strip duplicate ".gz.gz" suffix using plain string URLs
+  // Chunked files hosted on GitHub Pages (.part0001 .. .partNNNN)
+  const CHUNK_COUNTS = {
+    "assets.data": 18,
+    "image.bin.gz": 2,
+    "game.wasm.gz": 3
+  };
+  const mergedCache = new Map();
+
+  async function stitchParts(baseUrl, count) {
+    if (mergedCache.has(baseUrl)) return mergedCache.get(baseUrl);
+    const p = (async () => {
+      const bufs = [];
+      for (let i = 1; i <= count; i++) {
+        const partUrl = `${baseUrl}.part${String(i).padStart(4, "0")}`;
+        const r = await origFetch(partUrl);
+        if (!r.ok) throw new Error(`HTTP ${r.status} for ${partUrl}`);
+        bufs.push(await r.arrayBuffer());
+      }
+      return new Blob(bufs, { type: "application/octet-stream" });
+    })();
+    mergedCache.set(baseUrl, p);
+    p.catch(() => mergedCache.delete(baseUrl));
+    return p;
+  }
+
   const origFetch = window.fetch.bind(window);
-  window.fetch = function (input, init) {
-    if (typeof input === "string") {
-      return origFetch(input.replace(/(\.gz)\.gz(?=$|\?|#)/i, "$1"), init);
+  window.fetch = async function (input, init) {
+    let rawUrl = typeof input === "string" ? input : (input && input.url) || "";
+    const fixedUrl = rawUrl.replace(/(\.gz)\.gz(?=$|\?|#)/i, "$1");
+    const method = ((init && init.method) || (input && input.method) || "GET").toUpperCase();
+
+    const parsed = new URL(fixedUrl, window.location.href);
+    const fileName = parsed.pathname.split("/").pop();
+    if (Object.prototype.hasOwnProperty.call(CHUNK_COUNTS, fileName)) {
+      const baseClean = parsed.origin + parsed.pathname;
+      const blob = await stitchParts(baseClean, CHUNK_COUNTS[fileName]);
+      const headers = {
+        "Content-Type": fileName.endsWith(".wasm.gz") ? "application/wasm" : "application/octet-stream",
+        "Content-Length": String(blob.size)
+      };
+      return new Response(method === "HEAD" ? null : blob, { status: 200, headers });
     }
-    if (input && typeof input.url === "string" && /(\.gz)\.gz(?=$|\?|#)/i.test(input.url)) {
-      return origFetch(input.url.replace(/(\.gz)\.gz(?=$|\?|#)/i, "$1"), init || input);
-    }
+
+    if (typeof input === "string") return origFetch(fixedUrl, init);
+    if (fixedUrl !== rawUrl) return origFetch(fixedUrl, init || input);
     return origFetch(input, init);
   };
 
-  // Register Service Worker for chunk stitching + COOP/COEP SharedArrayBuffer isolation
+  // Register Service Worker for COOP/COEP SharedArrayBuffer isolation + offline caching
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./sw.js", { scope: "./" }).then(function (reg) {
+    navigator.serviceWorker.register("./sw.js", { scope: "./" }).then(function () {
       if (!window.crossOriginIsolated) {
         if (navigator.serviceWorker.controller && !sessionStorage.getItem("coi_reloaded")) {
           sessionStorage.setItem("coi_reloaded", "1");
