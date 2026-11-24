@@ -1,6 +1,5 @@
 const CACHE_NAME = "township-ghpages-v1";
 
-// Chunked files and their part counts (matching .part0001, .part0002, ...)
 const CHUNKED_FILES = {
   "assets.data": 18,
   "image.bin.gz": 2
@@ -94,7 +93,6 @@ async function handleWasmRequest(request) {
       let buf = await res.arrayBuffer();
       const u8 = new Uint8Array(buf);
 
-      // Inflate gzip payloads once so WebAssembly compilation never hits stream errors
       if (u8.length >= 2 && u8[0] === 0x1f && u8[1] === 0x8b && typeof DecompressionStream !== "undefined") {
         const ds = new DecompressionStream("gzip");
         buf = await new Response(new Blob([buf]).stream().pipeThrough(ds)).arrayBuffer();
@@ -132,25 +130,24 @@ self.addEventListener("fetch", (event) => {
     ? url.pathname.slice(scopePath.length)
     : url.pathname.replace(/^\/+/, "");
 
-  if (Object.prototype.hasOwnProperty.call(CHUNKED_FILES, relPath)) {
-    event.respondWith(handleChunkedRequest(relPath, CHUNKED_FILES[relPath]));
-    return;
-  }
-
-  if (/\.wasm(?:\.gz)?$/i.test(relPath)) {
-    event.respondWith(handleWasmRequest(req));
-    return;
-  }
+  const handler = (async () => {
+    if (Object.prototype.hasOwnProperty.call(CHUNKED_FILES, relPath)) {
+      return await handleChunkedRequest(relPath, CHUNKED_FILES[relPath]);
+    }
+    if (/\.wasm(?:\.gz)?$/i.test(relPath)) {
+      return await handleWasmRequest(req);
+    }
+    const cached = await caches.match(req);
+    if (cached) return cached;
+    return await fetch(req);
+  })();
 
   event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req).then((res) => {
-        if (res && res.ok && res.type === "basic") {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then((c) => c.put(req, copy)).catch(() => {});
-        }
-        return res;
+    handler.catch((err) => {
+      console.error("[SW Fetch Failed]", relPath, err);
+      return new Response(String(err && err.message ? err.message : err), {
+        status: 502,
+        statusText: "Service Worker Fetch Error"
       });
     })
   );
